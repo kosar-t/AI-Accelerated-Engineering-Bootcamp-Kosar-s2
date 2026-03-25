@@ -1,126 +1,127 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
+import {
+  Alert,
+  Box,
+  CircularProgress,
+  Container,
+  Divider,
+  Paper,
+  Typography,
+} from '@mui/material';
+import TodoForm from './components/TodoForm';
+import TodoList from './components/TodoList';
+import { fetchTodos, createTodo, updateTodo, deleteTodo } from './todoApi';
 
 function App() {
-  const [data, setData] = useState([]);
+  const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newItem, setNewItem] = useState('');
+  const [editingTodo, setEditingTodo] = useState(null);
 
   useEffect(() => {
-    fetchData();
+    loadTodos();
   }, []);
 
-  const fetchData = async () => {
+  const loadTodos = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/items');
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const result = await response.json();
-      setData(result);
+      const data = await fetchTodos();
+      setTodos(data);
       setError(null);
     } catch (err) {
-      setError('Failed to fetch data: ' + err.message);
-      console.error('Error fetching data:', err);
+      setError('Failed to fetch tasks: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!newItem.trim()) return;
-
+  const handleAdd = async (fields) => {
     try {
-      const response = await fetch('/api/items', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: newItem }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add item');
-      }
-
-      const result = await response.json();
-      setData([...data, result]);
-      setNewItem('');
+      const newTodo = await createTodo(fields);
+      setTodos((prev) => [newTodo, ...prev]);
+      setError(null);
     } catch (err) {
-      setError('Error adding item: ' + err.message);
-      console.error('Error adding item:', err);
+      setError('Error adding task: ' + err.message);
     }
   };
 
-  const handleDelete = async (itemId) => {
+  const handleSaveEdit = async (fields) => {
     try {
-      const response = await fetch(`/api/items/${itemId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete item');
-      }
-
-      setData(data.filter(item => item.id !== itemId));
+      const updated = await updateTodo(editingTodo.id, fields);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setEditingTodo(null);
       setError(null);
     } catch (err) {
-      setError('Error deleting item: ' + err.message);
-      console.error('Error deleting item:', err);
+      setError('Error updating task: ' + err.message);
+    }
+  };
+
+  const handleToggleComplete = async (todo) => {
+    try {
+      const updated = await updateTodo(todo.id, { completed: !todo.completed });
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setError(null);
+    } catch (err) {
+      setError('Error updating task: ' + err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteTodo(id);
+      setTodos((prev) => prev.filter((t) => t.id !== id));
+      setError(null);
+    } catch (err) {
+      setError('Error deleting task: ' + err.message);
     }
   };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>To Do App</h1>
-        <p>Keep track of your tasks</p>
-      </header>
+    <Container maxWidth="sm" sx={{ py: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom color="primary" fontWeight={700}>
+        To Do App
+      </Typography>
+      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+        Keep track of your tasks
+      </Typography>
 
-      <main>
-        <section className="add-item-section">
-          <h2>Add New Item</h2>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              placeholder="Enter item name"
-            />
-            <button type="submit">Add Item</button>
-          </form>
-        </section>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)} data-testid="error-alert">
+          {error}
+        </Alert>
+      )}
 
-        <section className="items-section">
-          <h2>Items from Database</h2>
-          {loading && <p>Loading data...</p>}
-          {error && <p className="error">{error}</p>}
-          {!loading && !error && (
-            <ul>
-              {data.length > 0 ? (
-                data.map((item) => (
-                  <li key={item.id}>
-                    <span>{item.name}</span>
-                    <button 
-                      onClick={() => handleDelete(item.id)}
-                      className="delete-btn"
-                      type="button"
-                    >
-                      Delete
-                    </button>
-                  </li>
-                ))
-              ) : (
-                <p>No items found. Add some!</p>
-              )}
-            </ul>
-          )}
-        </section>
-      </main>
-    </div>
+      <Paper sx={{ p: 3, mb: 3 }} elevation={2}>
+        <Typography variant="h6" gutterBottom>
+          {editingTodo ? 'Edit Task' : 'Add New Task'}
+        </Typography>
+        <TodoForm
+          key={editingTodo ? editingTodo.id : 'new'}
+          initialValues={editingTodo}
+          onSubmit={editingTodo ? handleSaveEdit : handleAdd}
+          onCancel={() => setEditingTodo(null)}
+        />
+      </Paper>
+
+      <Divider sx={{ mb: 2 }} />
+
+      <Typography variant="h6" gutterBottom>
+        Tasks
+      </Typography>
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress data-testid="loading-spinner" />
+        </Box>
+      ) : (
+        <TodoList
+          todos={todos}
+          onToggleComplete={handleToggleComplete}
+          onEdit={setEditingTodo}
+          onDelete={handleDelete}
+        />
+      )}
+    </Container>
   );
 }
 
