@@ -28,7 +28,7 @@ describe('TodoForm', () => {
 
     await user.type(screen.getByTestId('input-name'), '  Write tests  ');
     await user.type(screen.getByTestId('input-description'), 'Cover all cases');
-    fireEvent.click(screen.getByTestId('btn-add'));
+    await user.click(screen.getByTestId('btn-add'));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
@@ -66,7 +66,7 @@ describe('TodoForm', () => {
 
     const nameInput = screen.getByTestId('input-name');
     await user.type(nameInput, 'Temporary Task');
-    fireEvent.click(screen.getByTestId('btn-add'));
+    await user.click(screen.getByTestId('btn-add'));
 
     await waitFor(() => {
       expect(nameInput).toHaveValue('');
